@@ -1,29 +1,29 @@
-import React from "react"
-import { CardIdContext } from '~/utils/NewCardId'
-import { mapOrder } from "~/utils/sorts"
-import { useSortable } from "@dnd-kit/sortable"
-import { CSS } from "@dnd-kit/utilities"
-import Box from "@mui/material/Box"
-import Typography from "@mui/material/Typography"
-import Button from "@mui/material/Button"
-import Menu from "@mui/material/Menu"
-import MenuItem from "@mui/material/MenuItem"
-import Divider from "@mui/material/Divider"
-import ListItemText from "@mui/material/ListItemText"
-import ListItemIcon from "@mui/material/ListItemIcon"
-import AddCardIcon from "@mui/icons-material/AddCard"
-import ContentCut from "@mui/icons-material/ContentCut"
-import ContentCopy from "@mui/icons-material/ContentCopy"
-import ContentPaste from "@mui/icons-material/ContentPaste"
-import Cloud from "@mui/icons-material/Cloud"
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore"
-import Tooltip from "@mui/material/Tooltip"
-import DeleteForeverIcon from "@mui/icons-material/DeleteForever"
-import DragHandleIcon from "@mui/icons-material/DragHandle"
-import ListCards from "./ListCards/ListCards"
+import React from "react";
+import { CardIdContext } from "~/utils/NewCardId";
+import { mapOrder } from "~/utils/sorts";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
+import Button from "@mui/material/Button";
+import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
+import Divider from "@mui/material/Divider";
+import ListItemText from "@mui/material/ListItemText";
+import ListItemIcon from "@mui/material/ListItemIcon";
+import AddCardIcon from "@mui/icons-material/AddCard";
+import ContentCut from "@mui/icons-material/ContentCut";
+import ContentCopy from "@mui/icons-material/ContentCopy";
+import ContentPaste from "@mui/icons-material/ContentPaste";
+import Cloud from "@mui/icons-material/Cloud";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import Tooltip from "@mui/material/Tooltip";
+import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
+import DragHandleIcon from "@mui/icons-material/DragHandle";
+import ListCards from "./ListCards/ListCards";
 
-import TextField from "@mui/material/TextField"
-import CloseIcon from "@mui/icons-material/Close"
+import TextField from "@mui/material/TextField";
+import CloseIcon from "@mui/icons-material/Close";
 
 function Column({ column, setOrderedColumns }) {
   const {
@@ -36,7 +36,7 @@ function Column({ column, setOrderedColumns }) {
   } = useSortable({
     id: column._id,
     data: { ...column },
-  })
+  });
 
   const dndKitColumnStyles = {
     touchAction: "none",
@@ -46,34 +46,34 @@ function Column({ column, setOrderedColumns }) {
     transition,
     height: "100%",
     opacity: isDragging ? 0.5 : undefined,
-  }
+  };
 
-  const [anchorEl, setAnchorEl] = React.useState(null)
-  const open = Boolean(anchorEl)
-  const handleClick = (event) => setAnchorEl(event.currentTarget)
-  const handleClose = () => setAnchorEl(null)
+  const [anchorEl, setAnchorEl] = React.useState(null);
+  const open = Boolean(anchorEl);
+  const handleClick = (event) => setAnchorEl(event.currentTarget);
+  const handleClose = () => setAnchorEl(null);
 
   //Khởi tạo giá trị lưu trữ các card trong 1 column
-  const [orderedCards, setOrderedCards] = React.useState([])
+  const [orderedCards, setOrderedCards] = React.useState([]);
   React.useEffect(() => {
     if (column?.cards && column?.cardOrderIds) {
-      setOrderedCards(mapOrder(column.cards, column.cardOrderIds, "_id"))
+      setOrderedCards(mapOrder(column.cards, column.cardOrderIds, "_id"));
     }
-  }, [column])
+  }, [column]);
   //
 
   //Form tạo card mới
-  const [openNewCardForm, setOpenNewCardForm] = React.useState(false)
-  const toggleOpenNewCardForm = () => setOpenNewCardForm(!openNewCardForm)
+  const [openNewCardForm, setOpenNewCardForm] = React.useState(false);
+  const toggleOpenNewCardForm = () => setOpenNewCardForm(!openNewCardForm);
   //
 
   //Khởi tạo card mới
-  const { newCardId, incrementCardId } = React.useContext(CardIdContext)
-  const [newCardTitle, setNewCardTitle] = React.useState("")
-  const addNewCard = () => {
+  const { newCardId, incrementCardId } = React.useContext(CardIdContext);
+  const [newCardTitle, setNewCardTitle] = React.useState("");
+  const addNewCard = async () => {
     if (!newCardTitle) {
-      alert("Card title can not be empty!")
-      return
+      alert("Card title can not be empty!");
+      return;
     }
     const newCard = {
       _id: `card-id-${newCardId}`,
@@ -85,26 +85,36 @@ function Column({ column, setOrderedColumns }) {
       memberIds: [],
       comments: [],
       attachments: [],
+    };
+
+    try {
+      const response = await fetch(
+        `/boards/${boardId}/columns/${column._id}/cards`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(newCard),
+        }
+      );
+      const data = await response.json();
+      console.log("New card created:", data);
+      setOrderedCards([...column.cards, data]);
+      // Update the column's cards and cardOrderIds
+      const updatedColumn = {
+        ...column,
+        cards: [...column.cards, newCard],
+        cardOrderIds: [...column.cardOrderIds, newCard._id],
+      };
+      // Update the orderedColumns array
+      setOrderedColumns((prevColumns) =>
+        prevColumns.map((col) => (col._id === column._id ? updatedColumn : col))
+      );
+      incrementCardId();
+      toggleOpenNewCardForm();
+    } catch (error) {
+      console.error("Error creating card:", error);
     }
-    setOrderedCards([...column.cards, newCard])
-    //
-
-    // Update the column's cards and cardOrderIds
-    const updatedColumn = {
-      ...column,
-      cards: [...column.cards, newCard],
-      cardOrderIds: [...column.cardOrderIds, newCard._id],
-    }
-
-    // Update the orderedColumns array
-    setOrderedColumns((prevColumns) =>
-      prevColumns.map((col) => (col._id === column._id ? updatedColumn : col))
-    )
-
-    incrementCardId()
-    toggleOpenNewCardForm()
-    console.log(newCard)
-  }
+  };
 
   return (
     <div ref={setNodeRef} style={dndKitColumnStyles} {...attributes}>
@@ -307,7 +317,7 @@ function Column({ column, setOrderedColumns }) {
         </Box>
       </Box>
     </div>
-  )
+  );
 }
 
-export default Column
+export default Column;
