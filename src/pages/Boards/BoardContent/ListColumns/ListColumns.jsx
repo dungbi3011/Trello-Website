@@ -1,27 +1,27 @@
-import React from "react"
-import { mockData } from "~/apis/mock-data"
-import Box from "@mui/material/Box"
-import Column from "./Column/Column"
-import Button from "@mui/material/Button"
-import NoteAddIcon from "@mui/icons-material/NoteAdd"
-import TextField from "@mui/material/TextField"
-import CloseIcon from "@mui/icons-material/Close"
+import React from "react";
+import { mockData } from "~/apis/mock-data";
+import Box from "@mui/material/Box";
+import Column from "./Column/Column";
+import Button from "@mui/material/Button";
+import NoteAddIcon from "@mui/icons-material/NoteAdd";
+import TextField from "@mui/material/TextField";
+import CloseIcon from "@mui/icons-material/Close";
 import {
   SortableContext,
   horizontalListSortingStrategy,
-} from "@dnd-kit/sortable"
+} from "@dnd-kit/sortable";
 
 function ListColumns({ columns, setOrderedColumns }) {
-  const [openNewColumnForm, setOpenNewColumnForm] = React.useState(false)
+  const [openNewColumnForm, setOpenNewColumnForm] = React.useState(false);
   const toggleOpenNewColumnForm = () =>
-    setOpenNewColumnForm(!openNewColumnForm)
+    setOpenNewColumnForm(!openNewColumnForm);
 
-  const [newColumnTitle, setNewColumnTitle] = React.useState("")
-  const [newColumnId, setNewColumnId] = React.useState(5)
+  const [newColumnTitle, setNewColumnTitle] = React.useState("");
+  const [newColumnId, setNewColumnId] = React.useState(5);
   const addNewColumn = () => {
     if (!newColumnTitle) {
-      alert("Column title can not be empty!")
-      return
+      alert("Column title can not be empty!");
+      return;
     }
     const newColumn = {
       _id: `column-id-0${newColumnId}`,
@@ -29,19 +29,29 @@ function ListColumns({ columns, setOrderedColumns }) {
       title: newColumnTitle,
       cardOrderIds: [`column-id-0${newColumnId}-placeholder-card`],
       cards: [
-        { 
-          _id: `column-id-0${newColumnId}-placeholder-card`, 
-          boardId: 'board-id-01', 
+        {
+          _id: `column-id-0${newColumnId}-placeholder-card`,
+          boardId: "board-id-01",
           columnId: `column-id-0${newColumnId}`,
-          FE_PlaceholderCard: true
+          FE_PlaceholderCard: true,
         },
       ],
-    }
+    };
     // mockData.board.columnOrderIds.add(newColumn._id)
-    setOrderedColumns([...columns, newColumn])
-    toggleOpenNewColumnForm()
-    setNewColumnId(newColumnId + 1)
-  }
+    setOrderedColumns([...columns, newColumn]);
+    toggleOpenNewColumnForm();
+    setNewColumnId(newColumnId + 1);
+  };
+
+  const removeColumn = (columnID) => {
+    setOrderedColumns(columns.filter((column) => column._id !== columnID));
+  };
+
+  const updateColumn = (updatedColumn) => {
+    setOrderedColumns(columns.map(column =>
+      column._id === updatedColumn._id ? updatedColumn : column
+    ));
+  };
 
   return (
     <SortableContext
@@ -60,7 +70,13 @@ function ListColumns({ columns, setOrderedColumns }) {
         }}
       >
         {columns?.map((column) => (
-          <Column key={column._id} column={column} setOrderedColumns={setOrderedColumns} />
+          <Column
+            key={column._id}
+            column={column}
+            setOrderedColumns={setOrderedColumns}
+            removeColumn={removeColumn}
+            updateColumn={updateColumn}
+          />
         ))}
         {/* Box Add new column CTA */}
         {!openNewColumnForm ? (
@@ -151,7 +167,7 @@ function ListColumns({ columns, setOrderedColumns }) {
         )}
       </Box>
     </SortableContext>
-  )
+  );
 }
 
-export default ListColumns
+export default ListColumns;

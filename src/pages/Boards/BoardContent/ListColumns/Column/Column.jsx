@@ -1,31 +1,28 @@
-import React from "react"
-import { CardIdContext } from '~/utils/NewCardId'
-import { mapOrder } from "~/utils/sorts"
-import { useSortable } from "@dnd-kit/sortable"
-import { CSS } from "@dnd-kit/utilities"
-import Box from "@mui/material/Box"
-import Typography from "@mui/material/Typography"
-import Button from "@mui/material/Button"
-import Menu from "@mui/material/Menu"
-import MenuItem from "@mui/material/MenuItem"
-import Divider from "@mui/material/Divider"
-import ListItemText from "@mui/material/ListItemText"
-import ListItemIcon from "@mui/material/ListItemIcon"
-import AddCardIcon from "@mui/icons-material/AddCard"
-import ContentCut from "@mui/icons-material/ContentCut"
-import ContentCopy from "@mui/icons-material/ContentCopy"
-import ContentPaste from "@mui/icons-material/ContentPaste"
-import Cloud from "@mui/icons-material/Cloud"
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore"
-import Tooltip from "@mui/material/Tooltip"
-import DeleteForeverIcon from "@mui/icons-material/DeleteForever"
-import DragHandleIcon from "@mui/icons-material/DragHandle"
-import ListCards from "./ListCards/ListCards"
+import React from "react";
+import { CardIdContext } from "~/utils/NewCardId";
+import { mapOrder } from "~/utils/sorts";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
+import Button from "@mui/material/Button";
+import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
+import Divider from "@mui/material/Divider";
+import ListItemText from "@mui/material/ListItemText";
+import ListItemIcon from "@mui/material/ListItemIcon";
+import AddCardIcon from "@mui/icons-material/AddCard";
+import EditIcon from "@mui/icons-material/Edit";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import Tooltip from "@mui/material/Tooltip";
+import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
+import DragHandleIcon from "@mui/icons-material/DragHandle";
+import ListCards from "./ListCards/ListCards";
 
-import TextField from "@mui/material/TextField"
-import CloseIcon from "@mui/icons-material/Close"
+import TextField from "@mui/material/TextField";
+import CloseIcon from "@mui/icons-material/Close";
 
-function Column({ column, setOrderedColumns }) {
+function Column({ column, setOrderedColumns, removeColumn, updateColumn }) {
   const {
     attributes,
     listeners,
@@ -36,7 +33,7 @@ function Column({ column, setOrderedColumns }) {
   } = useSortable({
     id: column._id,
     data: { ...column },
-  })
+  });
 
   const dndKitColumnStyles = {
     touchAction: "none",
@@ -46,34 +43,34 @@ function Column({ column, setOrderedColumns }) {
     transition,
     height: "100%",
     opacity: isDragging ? 0.5 : undefined,
-  }
+  };
 
-  const [anchorEl, setAnchorEl] = React.useState(null)
-  const open = Boolean(anchorEl)
-  const handleClick = (event) => setAnchorEl(event.currentTarget)
-  const handleClose = () => setAnchorEl(null)
+  const [anchorEl, setAnchorEl] = React.useState(null);
+  const open = Boolean(anchorEl);
+  const handleClick = (event) => setAnchorEl(event.currentTarget);
+  const handleClose = () => setAnchorEl(null);
 
   //Khởi tạo giá trị lưu trữ các card trong 1 column
-  const [orderedCards, setOrderedCards] = React.useState([])
+  const [orderedCards, setOrderedCards] = React.useState([]);
   React.useEffect(() => {
     if (column?.cards && column?.cardOrderIds) {
-      setOrderedCards(mapOrder(column.cards, column.cardOrderIds, "_id"))
+      setOrderedCards(mapOrder(column.cards, column.cardOrderIds, "_id"));
     }
-  }, [column])
+  }, [column]);
   //
 
   //Form tạo card mới
-  const [openNewCardForm, setOpenNewCardForm] = React.useState(false)
-  const toggleOpenNewCardForm = () => setOpenNewCardForm(!openNewCardForm)
+  const [openNewCardForm, setOpenNewCardForm] = React.useState(false);
+  const toggleOpenNewCardForm = () => setOpenNewCardForm(!openNewCardForm);
   //
 
   //Khởi tạo card mới
-  const { newCardId, incrementCardId } = React.useContext(CardIdContext)
-  const [newCardTitle, setNewCardTitle] = React.useState("")
+  const { newCardId, incrementCardId } = React.useContext(CardIdContext);
+  const [newCardTitle, setNewCardTitle] = React.useState("");
   const addNewCard = () => {
     if (!newCardTitle) {
-      alert("Card title can not be empty!")
-      return
+      alert("Card title can not be empty!");
+      return;
     }
     const newCard = {
       _id: `card-id-${newCardId}`,
@@ -85,8 +82,8 @@ function Column({ column, setOrderedColumns }) {
       memberIds: [],
       comments: [],
       attachments: [],
-    }
-    setOrderedCards([...column.cards, newCard])
+    };
+    setOrderedCards([...column.cards, newCard]);
     //
 
     // Update the column's cards and cardOrderIds
@@ -94,17 +91,30 @@ function Column({ column, setOrderedColumns }) {
       ...column,
       cards: [...column.cards, newCard],
       cardOrderIds: [...column.cardOrderIds, newCard._id],
-    }
+    };
 
     // Update the orderedColumns array
     setOrderedColumns((prevColumns) =>
       prevColumns.map((col) => (col._id === column._id ? updatedColumn : col))
-    )
+    );
 
-    incrementCardId()
-    toggleOpenNewCardForm()
-    console.log(newCard)
-  }
+    incrementCardId();
+    toggleOpenNewCardForm();
+    console.log(newCard);
+  };
+
+  const removeCard = (columnId, cardId) => {
+    setOrderedColumns((prevColumns) =>
+      prevColumns.map((column) =>
+        column._id === columnId
+          ? {
+              ...column,
+              cards: column.cards.filter((card) => card._id !== cardId),
+            }
+          : column
+      )
+    );
+  };
 
   return (
     <div ref={setNodeRef} style={dndKitColumnStyles} {...attributes}>
@@ -165,32 +175,7 @@ function Column({ column, setOrderedColumns }) {
                 "aria-labelledby": "basic-column-dropdown",
               }}
             >
-              <MenuItem>
-                <ListItemIcon>
-                  <AddCardIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>Add new card</ListItemText>
-              </MenuItem>
-              <MenuItem>
-                <ListItemIcon>
-                  <ContentCut fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>Cut</ListItemText>
-              </MenuItem>
-              <MenuItem>
-                <ListItemIcon>
-                  <ContentCopy fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>Copy</ListItemText>
-              </MenuItem>
-              <MenuItem>
-                <ListItemIcon>
-                  <ContentPaste fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>Paste</ListItemText>
-              </MenuItem>
-              <Divider />
-              <MenuItem>
+              <MenuItem onClick={() => removeColumn(column._id)}>
                 <ListItemIcon>
                   <DeleteForeverIcon fontSize="small" />
                 </ListItemIcon>
@@ -198,15 +183,15 @@ function Column({ column, setOrderedColumns }) {
               </MenuItem>
               <MenuItem>
                 <ListItemIcon>
-                  <Cloud fontSize="small" />
+                  <EditIcon fontSize="small" />
                 </ListItemIcon>
-                <ListItemText>Archive this column</ListItemText>
+                <ListItemText>Edit this column</ListItemText>
               </MenuItem>
             </Menu>
           </Box>
         </Box>
         {/* {Box List Card} */}
-        <ListCards cards={orderedCards} />
+        <ListCards cards={orderedCards} removeCard={removeCard} columnID={column._id}/>
         {/* {Box Footer} */}
         <Box
           sx={{
@@ -307,7 +292,7 @@ function Column({ column, setOrderedColumns }) {
         </Box>
       </Box>
     </div>
-  )
+  );
 }
 
-export default Column
+export default Column;
