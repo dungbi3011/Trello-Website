@@ -86,7 +86,7 @@ function Column({ column, setOrderedColumns, removeColumn, updateColumn }) {
     setOrderedCards([...column.cards, newCard]);
     //
 
-    // Update the column's cards and cardOrderIds
+    // Cập nhật danh sách thẻ trong cùng 1 cột
     const updatedColumn = {
       ...column,
       cards: [...column.cards, newCard],
@@ -103,7 +103,7 @@ function Column({ column, setOrderedColumns, removeColumn, updateColumn }) {
     console.log(newCard);
   };
 
-  //Function to remove cards
+  //Hàm giúp xóa card - thẻ
   const removeCard = (columnId, cardId) => {
     setOrderedColumns((prevColumns) =>
       prevColumns.map((column) =>
@@ -118,6 +118,7 @@ function Column({ column, setOrderedColumns, removeColumn, updateColumn }) {
   };
   //
 
+  //Hàm giúp update, sửa tên card - thẻ
   const updateCard = (columnId, updatedCard) => {
     setOrderedColumns((prevColumns) =>
       prevColumns.map((column) =>
@@ -133,7 +134,7 @@ function Column({ column, setOrderedColumns, removeColumn, updateColumn }) {
     );
   };
 
-  // New states for editing title
+  // Khởi tạo giá trị cho việc update
   const [isEditing, setIsEditing] = React.useState(false);
   const [newTitle, setNewTitle] = React.useState(column.title);
 

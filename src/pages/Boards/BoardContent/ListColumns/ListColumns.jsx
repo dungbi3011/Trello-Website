@@ -1,5 +1,4 @@
 import React from "react";
-import { mockData } from "~/apis/mock-data";
 import Box from "@mui/material/Box";
 import Column from "./Column/Column";
 import Button from "@mui/material/Button";
@@ -37,7 +36,6 @@ function ListColumns({ columns, setOrderedColumns }) {
         },
       ],
     };
-    // mockData.board.columnOrderIds.add(newColumn._id)
     setOrderedColumns([...columns, newColumn]);
     toggleOpenNewColumnForm();
     setNewColumnId(newColumnId + 1);

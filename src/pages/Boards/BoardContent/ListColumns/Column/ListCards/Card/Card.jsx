@@ -57,7 +57,7 @@ function Card({ card, removeCard, updateCard, columnId }) {
   const handleClose = () => setAnchorEl(null);
   //
 
-  // New states for editing title
+  // Khởi tạo giá trị cho việc update
   const [isEditing, setIsEditing] = React.useState(false);
   const [newTitle, setNewTitle] = React.useState(card.title);
 
