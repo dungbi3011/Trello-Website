@@ -8,24 +8,19 @@ import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
 import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
-import Divider from "@mui/material/Divider";
 import ListItemText from "@mui/material/ListItemText";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import AddCardIcon from "@mui/icons-material/AddCard";
-import ContentCut from "@mui/icons-material/ContentCut";
-import ContentCopy from "@mui/icons-material/ContentCopy";
-import ContentPaste from "@mui/icons-material/ContentPaste";
-import Cloud from "@mui/icons-material/Cloud";
+import EditIcon from "@mui/icons-material/Edit";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import Tooltip from "@mui/material/Tooltip";
 import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import DragHandleIcon from "@mui/icons-material/DragHandle";
 import ListCards from "./ListCards/ListCards";
-
 import TextField from "@mui/material/TextField";
 import CloseIcon from "@mui/icons-material/Close";
 
-function Column({ column, setOrderedColumns }) {
+function Column({ column, setOrderedColumns, removeColumn, updateColumn }) {
   const {
     attributes,
     listeners,
@@ -48,10 +43,12 @@ function Column({ column, setOrderedColumns }) {
     opacity: isDragging ? 0.5 : undefined,
   };
 
+  //Khởi tạo giá trị cho menu
   const [anchorEl, setAnchorEl] = React.useState(null);
   const open = Boolean(anchorEl);
   const handleClick = (event) => setAnchorEl(event.currentTarget);
   const handleClose = () => setAnchorEl(null);
+  //
 
   //Khởi tạo giá trị lưu trữ các card trong 1 column
   const [orderedCards, setOrderedCards] = React.useState([]);
@@ -116,6 +113,58 @@ function Column({ column, setOrderedColumns }) {
     }
   };
 
+  //Function to remove cards
+  const removeCard = (columnId, cardId) => {
+    setOrderedColumns((prevColumns) =>
+      prevColumns.map((column) =>
+        column._id === columnId
+          ? {
+              ...column,
+              cards: column.cards.filter((card) => card._id !== cardId),
+            }
+          : column
+      )
+    );
+  };
+  //
+
+  const updateCard = (columnId, updatedCard) => {
+    setOrderedColumns((prevColumns) =>
+      prevColumns.map((column) =>
+        column._id === columnId
+          ? {
+              ...column,
+              cards: column.cards.map((card) =>
+                card._id === updatedCard._id ? updatedCard : card
+              ),
+            }
+          : column
+      )
+    );
+  };
+
+  // New states for editing title
+  const [isEditing, setIsEditing] = React.useState(false);
+  const [newTitle, setNewTitle] = React.useState(column.title);
+
+  const handleEditClick = () => {
+    setIsEditing(true);
+  };
+
+  const handleTitleChange = (e) => {
+    setNewTitle(e.target.value);
+  };
+
+  const handleTitleSubmit = () => {
+    const updatedColumn = { ...column, title: newTitle };
+    updateColumn(updatedColumn);
+    setOrderedColumns((prevColumns) =>
+      prevColumns.map((col) => (col._id === column._id ? updatedColumn : col))
+    );
+    setIsEditing(false);
+  };
+  //
+
   return (
     <div ref={setNodeRef} style={dndKitColumnStyles} {...attributes}>
       <Box
@@ -142,16 +191,71 @@ function Column({ column, setOrderedColumns }) {
             justifyContent: "space-between",
           }}
         >
-          <Typography
-            variant="h6"
-            sx={{
-              fontSize: "1rem",
-              fontWeight: "bold",
-              cursor: "pointer",
-            }}
-          >
-            {column?.title}
-          </Typography>
+          {isEditing ? (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <TextField
+                value={newTitle}
+                onChange={handleTitleChange}
+                label="Edit column title"
+                type="text"
+                size="small"
+                variant="outlined"
+                autoFocus
+                inputProps={{
+                  maxLength: 28,
+                }}
+                sx={{
+                  "& label": { color: "text.primary" },
+                  "& input": {
+                    color: (theme) => theme.palette.primary.main,
+                    bgcolor: (theme) =>
+                      theme.palette.mode === "dark" ? "#333643" : "white",
+                  },
+                  "& label.Mui-focused": {
+                    color: (theme) => theme.palette.primary.main,
+                  },
+                  "& .MuiOutlinedInput-root": {
+                    "& fieldset": {
+                      borderColor: (theme) => theme.palette.primary.main,
+                    },
+                    "&:hover fieldset": {
+                      borderColor: (theme) => theme.palette.primary.main,
+                    },
+                    "&.Mui-focused fieldset": {
+                      borderColor: (theme) => theme.palette.primary.main,
+                    },
+                  },
+                  "& .MuiOutlinedInput-input": {
+                    borderRadius: 1,
+                  },
+                }}
+              />
+              <Button
+                onClick={handleTitleSubmit}
+                variant="contained"
+                size="small"
+                color="success"
+                sx={{
+                  boxShadow: "none",
+                  border: "0.5px solid",
+                  borderColor: (theme) => theme.palette.success.main,
+                  "&:hover": {
+                    bgcolor: (theme) => theme.palette.success.main,
+                  },
+                  gap: 1,
+                }}
+              >
+                Save
+              </Button>
+            </Box>
+          ) : (
+            <Typography
+              variant="h6"
+              sx={{ fontSize: "1rem", fontWeight: "bold", cursor: "pointer" }}
+            >
+              {column.title}
+            </Typography>
+          )}
           <Box>
             <Tooltip title="More options">
               <ExpandMoreIcon
@@ -175,48 +279,28 @@ function Column({ column, setOrderedColumns }) {
                 "aria-labelledby": "basic-column-dropdown",
               }}
             >
-              <MenuItem>
-                <ListItemIcon>
-                  <AddCardIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>Add new card</ListItemText>
-              </MenuItem>
-              <MenuItem>
-                <ListItemIcon>
-                  <ContentCut fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>Cut</ListItemText>
-              </MenuItem>
-              <MenuItem>
-                <ListItemIcon>
-                  <ContentCopy fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>Copy</ListItemText>
-              </MenuItem>
-              <MenuItem>
-                <ListItemIcon>
-                  <ContentPaste fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>Paste</ListItemText>
-              </MenuItem>
-              <Divider />
-              <MenuItem>
+              <MenuItem onClick={() => removeColumn(column._id)}>
                 <ListItemIcon>
                   <DeleteForeverIcon fontSize="small" />
                 </ListItemIcon>
                 <ListItemText>Remove this column</ListItemText>
               </MenuItem>
-              <MenuItem>
+              <MenuItem onClick={handleEditClick}>
                 <ListItemIcon>
-                  <Cloud fontSize="small" />
+                  <EditIcon fontSize="small" />
                 </ListItemIcon>
-                <ListItemText>Archive this column</ListItemText>
+                <ListItemText>Edit this column</ListItemText>
               </MenuItem>
             </Menu>
           </Box>
         </Box>
         {/* {Box List Card} */}
-        <ListCards cards={orderedCards} />
+        <ListCards
+          cards={orderedCards}
+          removeCard={removeCard}
+          updateCard={updateCard}
+          columnID={column._id}
+        />
         {/* {Box Footer} */}
         <Box
           sx={{

@@ -1,4 +1,5 @@
 import React from "react";
+import { mockData } from "~/apis/mock-data";
 import Box from "@mui/material/Box";
 import Column from "./Column/Column";
 import Button from "@mui/material/Button";
@@ -17,7 +18,6 @@ function ListColumns({ columns, setOrderedColumns }) {
 
   const [newColumnTitle, setNewColumnTitle] = React.useState("");
   const [newColumnId, setNewColumnId] = React.useState(5);
-
   const addNewColumn = async () => {
     if (!newColumnTitle) {
       alert("Column title can not be empty!");
@@ -55,6 +55,16 @@ function ListColumns({ columns, setOrderedColumns }) {
     }
   };
 
+  const removeColumn = (columnID) => {
+    setOrderedColumns(columns.filter((column) => column._id !== columnID));
+  };
+
+  const updateColumn = (updatedColumn) => {
+    setOrderedColumns(columns.map(column =>
+      column._id === updatedColumn._id ? updatedColumn : column
+    ));
+  };
+
   return (
     <SortableContext
       items={columns?.map((c) => c._id)}
@@ -76,6 +86,8 @@ function ListColumns({ columns, setOrderedColumns }) {
             key={column._id}
             column={column}
             setOrderedColumns={setOrderedColumns}
+            removeColumn={removeColumn}
+            updateColumn={updateColumn}
           />
         ))}
         {/* Box Add new column CTA */}
