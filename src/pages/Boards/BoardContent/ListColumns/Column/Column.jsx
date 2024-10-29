@@ -8,7 +8,6 @@ import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
 import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
-import Divider from "@mui/material/Divider";
 import ListItemText from "@mui/material/ListItemText";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import AddCardIcon from "@mui/icons-material/AddCard";
@@ -18,7 +17,6 @@ import Tooltip from "@mui/material/Tooltip";
 import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import DragHandleIcon from "@mui/icons-material/DragHandle";
 import ListCards from "./ListCards/ListCards";
-
 import TextField from "@mui/material/TextField";
 import CloseIcon from "@mui/icons-material/Close";
 
@@ -45,10 +43,12 @@ function Column({ column, setOrderedColumns, removeColumn, updateColumn }) {
     opacity: isDragging ? 0.5 : undefined,
   };
 
+  //Khởi tạo giá trị cho menu
   const [anchorEl, setAnchorEl] = React.useState(null);
   const open = Boolean(anchorEl);
   const handleClick = (event) => setAnchorEl(event.currentTarget);
   const handleClose = () => setAnchorEl(null);
+  //
 
   //Khởi tạo giá trị lưu trữ các card trong 1 column
   const [orderedCards, setOrderedCards] = React.useState([]);
@@ -103,6 +103,7 @@ function Column({ column, setOrderedColumns, removeColumn, updateColumn }) {
     console.log(newCard);
   };
 
+  //Function to remove cards
   const removeCard = (columnId, cardId) => {
     setOrderedColumns((prevColumns) =>
       prevColumns.map((column) =>
@@ -115,6 +116,44 @@ function Column({ column, setOrderedColumns, removeColumn, updateColumn }) {
       )
     );
   };
+  //
+
+  const updateCard = (columnId, updatedCard) => {
+    setOrderedColumns((prevColumns) =>
+      prevColumns.map((column) =>
+        column._id === columnId
+          ? {
+              ...column,
+              cards: column.cards.map((card) =>
+                card._id === updatedCard._id ? updatedCard : card
+              ),
+            }
+          : column
+      )
+    );
+  };
+
+  // New states for editing title
+  const [isEditing, setIsEditing] = React.useState(false);
+  const [newTitle, setNewTitle] = React.useState(column.title);
+
+  const handleEditClick = () => {
+    setIsEditing(true);
+  };
+
+  const handleTitleChange = (e) => {
+    setNewTitle(e.target.value);
+  };
+
+  const handleTitleSubmit = () => {
+    const updatedColumn = { ...column, title: newTitle };
+    updateColumn(updatedColumn);
+    setOrderedColumns((prevColumns) =>
+      prevColumns.map((col) => (col._id === column._id ? updatedColumn : col))
+    );
+    setIsEditing(false);
+  };
+  //
 
   return (
     <div ref={setNodeRef} style={dndKitColumnStyles} {...attributes}>
@@ -142,16 +181,71 @@ function Column({ column, setOrderedColumns, removeColumn, updateColumn }) {
             justifyContent: "space-between",
           }}
         >
-          <Typography
-            variant="h6"
-            sx={{
-              fontSize: "1rem",
-              fontWeight: "bold",
-              cursor: "pointer",
-            }}
-          >
-            {column?.title}
-          </Typography>
+          {isEditing ? (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <TextField
+                value={newTitle}
+                onChange={handleTitleChange}
+                label="Edit column title"
+                type="text"
+                size="small"
+                variant="outlined"
+                autoFocus
+                inputProps={{
+                  maxLength: 28,
+                }}
+                sx={{
+                  "& label": { color: "text.primary" },
+                  "& input": {
+                    color: (theme) => theme.palette.primary.main,
+                    bgcolor: (theme) =>
+                      theme.palette.mode === "dark" ? "#333643" : "white",
+                  },
+                  "& label.Mui-focused": {
+                    color: (theme) => theme.palette.primary.main,
+                  },
+                  "& .MuiOutlinedInput-root": {
+                    "& fieldset": {
+                      borderColor: (theme) => theme.palette.primary.main,
+                    },
+                    "&:hover fieldset": {
+                      borderColor: (theme) => theme.palette.primary.main,
+                    },
+                    "&.Mui-focused fieldset": {
+                      borderColor: (theme) => theme.palette.primary.main,
+                    },
+                  },
+                  "& .MuiOutlinedInput-input": {
+                    borderRadius: 1,
+                  },
+                }}
+              />
+              <Button
+                onClick={handleTitleSubmit}
+                variant="contained"
+                size="small"
+                color="success"
+                sx={{
+                  boxShadow: "none",
+                  border: "0.5px solid",
+                  borderColor: (theme) => theme.palette.success.main,
+                  "&:hover": {
+                    bgcolor: (theme) => theme.palette.success.main,
+                  },
+                  gap: 1,
+                }}
+              >
+                Save
+              </Button>
+            </Box>
+          ) : (
+            <Typography
+              variant="h6"
+              sx={{ fontSize: "1rem", fontWeight: "bold", cursor: "pointer" }}
+            >
+              {column.title}
+            </Typography>
+          )}
           <Box>
             <Tooltip title="More options">
               <ExpandMoreIcon
@@ -181,7 +275,7 @@ function Column({ column, setOrderedColumns, removeColumn, updateColumn }) {
                 </ListItemIcon>
                 <ListItemText>Remove this column</ListItemText>
               </MenuItem>
-              <MenuItem>
+              <MenuItem onClick={handleEditClick}>
                 <ListItemIcon>
                   <EditIcon fontSize="small" />
                 </ListItemIcon>
@@ -191,7 +285,12 @@ function Column({ column, setOrderedColumns, removeColumn, updateColumn }) {
           </Box>
         </Box>
         {/* {Box List Card} */}
-        <ListCards cards={orderedCards} removeCard={removeCard} columnID={column._id}/>
+        <ListCards
+          cards={orderedCards}
+          removeCard={removeCard}
+          updateCard={updateCard}
+          columnID={column._id}
+        />
         {/* {Box Footer} */}
         <Box
           sx={{

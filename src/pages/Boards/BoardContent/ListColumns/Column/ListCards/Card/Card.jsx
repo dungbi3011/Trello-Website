@@ -8,10 +8,10 @@ import CardMedia from "@mui/material/CardMedia";
 import GroupIcon from "@mui/icons-material/Group";
 import CommentIcon from "@mui/icons-material/Comment";
 import AttachmentIcon from "@mui/icons-material/Attachment";
-import RemoveCircleIcon from "@mui/icons-material/RemoveCircle";
 import Tooltip from "@mui/material/Tooltip";
 import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
+import TextField from "@mui/material/TextField";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
@@ -19,7 +19,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-function Card({ card, removeCard, columnId }) {
+function Card({ card, removeCard, updateCard, columnId }) {
   const {
     attributes,
     listeners,
@@ -50,20 +50,41 @@ function Card({ card, removeCard, columnId }) {
     );
   };
 
+  //Khởi tạo giá trị cho Menu
   const [anchorEl, setAnchorEl] = React.useState(null);
   const open = Boolean(anchorEl);
   const handleClick = (event) => setAnchorEl(event.currentTarget);
   const handleClose = () => setAnchorEl(null);
+  //
+
+  // New states for editing title
+  const [isEditing, setIsEditing] = React.useState(false);
+  const [newTitle, setNewTitle] = React.useState(card.title);
+
+  const handleEditClick = () => {
+    setIsEditing(true);
+  };
+
+  const handleTitleChange = (e) => {
+    setNewTitle(e.target.value);
+  };
+
+  const handleTitleSubmit = () => {
+    const updatedCard = { ...card, title: newTitle };
+    updateCard(columnId, updatedCard);
+    setIsEditing(false);
+  };
+  //
 
   return (
     <>
-      <Tooltip title="More options">
+      <Tooltip>
         <MuiCard
           ref={setNodeRef}
           style={dndKitCardStyles}
           {...attributes}
           {...listeners}
-          sx={{
+          sx={{ 
             cursor: "pointer",
             boxShadow: "0 1px 1px rgba(0, 0, 0, 0.2)",
             overflow: "unset",
@@ -79,7 +100,19 @@ function Card({ card, removeCard, columnId }) {
           )}
 
           <CardContent sx={{ p: 1.5, "&:last-child": { p: 1.5 } }}>
-            <Typography>{card?.title}</Typography>
+          {isEditing ? (
+              <TextField
+                value={newTitle}
+                onChange={handleTitleChange}
+                size="small"
+                sx={{ width: "100%" }}
+                inputProps={{
+                  maxLength: 30,
+                }}
+              />
+            ) : (
+              <Typography>{card?.title}</Typography>
+            )}
           </CardContent>
           {shouldShowCardActions() && (
             <CardActions sx={{ p: "0 4px 8px 4px " }}>
@@ -102,6 +135,17 @@ function Card({ card, removeCard, columnId }) {
           )}
         </MuiCard>
       </Tooltip>
+      {isEditing && (
+        <Button
+          onClick={handleTitleSubmit}
+          variant="contained"
+          color="primary"
+          size="small"
+          sx={{ marginLeft: 1.9, marginRight: 1.9 }}
+        >
+          Save
+        </Button>
+      )}
       <Menu
         id="basic-menu-column-dropdown"
         anchorEl={anchorEl}
@@ -117,7 +161,7 @@ function Card({ card, removeCard, columnId }) {
           </ListItemIcon>
           <ListItemText>Remove this card</ListItemText>
         </MenuItem>
-        <MenuItem>
+        <MenuItem onClick={handleEditClick}>
           <ListItemIcon>
             <EditIcon fontSize="small" />
           </ListItemIcon>
