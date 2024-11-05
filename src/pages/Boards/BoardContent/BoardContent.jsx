@@ -382,6 +382,7 @@ function BoardContent({ board }) {
         }}
       >
         <ListColumns
+          boardID={board._id}
           columns={orderedColumns}
           setOrderedColumns={setOrderedColumns}
         />

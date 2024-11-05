@@ -11,42 +11,35 @@ import {
   horizontalListSortingStrategy,
 } from "@dnd-kit/sortable";
 
-function ListColumns({ columns, setOrderedColumns }) {
+function ListColumns({ boardID, columns, setOrderedColumns }) {
   const [openNewColumnForm, setOpenNewColumnForm] = React.useState(false);
   const toggleOpenNewColumnForm = () =>
     setOpenNewColumnForm(!openNewColumnForm);
 
   const [newColumnTitle, setNewColumnTitle] = React.useState("");
   const [newColumnId, setNewColumnId] = React.useState(5);
+
   const addNewColumn = async () => {
+    const boardId = boardID; // Define boardId directly
+
     if (!newColumnTitle) {
       alert("Column title can not be empty!");
       return;
     }
     const newColumn = {
-      _id: `column-id-0${newColumnId}`,
-      boardId: "board-id-01",
       title: newColumnTitle,
-      cardOrderIds: [`column-id-0${newColumnId}-placeholder-card`],
-      cards: [
-        {
-          _id: `column-id-0${newColumnId}-placeholder-card`,
-          boardId: "board-id-01",
-          columnId: `column-id-0${newColumnId}`,
-          FE_PlaceholderCard: true,
-        },
-      ],
     };
-    // mockData.board.columnOrderIds.add(newColumn._id)
 
     try {
-      const response = await fetch(`/boards/${boardId}/columns`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newColumn),
-      });
+      const response = await fetch(
+        `http://127.0.0.1:5000/boards/${boardId}/columns`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(newColumn),
+        }
+      );
       const data = await response.json();
-      console.log("New column created:", data);
       setOrderedColumns([...columns, data]);
       toggleOpenNewColumnForm();
       setNewColumnId(newColumnId + 1);
@@ -55,14 +48,52 @@ function ListColumns({ columns, setOrderedColumns }) {
     }
   };
 
-  const removeColumn = (columnID) => {
-    setOrderedColumns(columns.filter((column) => column._id !== columnID));
+  const removeColumn = async (columnID) => {
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:5000/boards/${boardID}/columns/${columnID}`,
+        {
+          method: "DELETE",
+        }
+      );
+  
+      if (!response.ok) {
+        throw new Error("Failed to delete column");
+      }
+  
+      // Remove column from local state if deletion was successful
+      setOrderedColumns(columns.filter((column) => column._id !== columnID));
+      console.log(`Column ${columnID} removed successfully`);
+    } catch (error) {
+      console.error("Error deleting column:", error);
+    }
   };
 
-  const updateColumn = (updatedColumn) => {
-    setOrderedColumns(columns.map(column =>
-      column._id === updatedColumn._id ? updatedColumn : column
-    ));
+  const updateColumn = async (updatedColumn) => {
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:5000/boards/${boardID}/columns/${updatedColumn._id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatedColumn),
+        }
+      );
+  
+      if (!response.ok) {
+        throw new Error("Failed to update column");
+      }
+  
+      const data = await response.json();
+  
+      // Update the column in the local state
+      setOrderedColumns(
+        columns.map((column) => (column._id === updatedColumn._id ? data : column))
+      );
+      console.log(`Column ${updatedColumn._id} updated successfully`);
+    } catch (error) {
+      console.error("Error updating column:", error);
+    }
   };
 
   return (
@@ -84,6 +115,7 @@ function ListColumns({ columns, setOrderedColumns }) {
         {columns?.map((column) => (
           <Column
             key={column._id}
+            boardID={boardID}
             column={column}
             setOrderedColumns={setOrderedColumns}
             removeColumn={removeColumn}

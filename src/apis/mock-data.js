@@ -1,21 +1,20 @@
-import axios from "axios";
+  import axios from "axios";
 
-const fetchBoardData = async () => {
-  try {
-    const response = await axios.get(
-      "http://127.0.0.1:5000"
-    ); // Adjust URL if needed
-    return response.data;
-  } catch (error) {
-    console.error("Error fetching board data:", error);
-    return null; // Handle errors appropriately
-  }
-};
+  const fetchBoardData = async () => {
+    try {
+      const response = await axios.get(
+        "http://127.0.0.1:5000/boards/board-id-01"
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching board data:", error);
+      return null;
+    }
+  };
 
-export const mockData = {
-  // ... other data
-  board: fetchBoardData(),
-};
+  export const mockData = {
+    board: await fetchBoardData(),
+  };
 
 // export const mockData = {
 //     board: {

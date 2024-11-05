@@ -20,7 +20,13 @@ import ListCards from "./ListCards/ListCards";
 import TextField from "@mui/material/TextField";
 import CloseIcon from "@mui/icons-material/Close";
 
-function Column({ column, setOrderedColumns, removeColumn, updateColumn }) {
+function Column({
+  column,
+  boardID,
+  setOrderedColumns,
+  removeColumn,
+  updateColumn,
+}) {
   const {
     attributes,
     listeners,
@@ -65,83 +71,136 @@ function Column({ column, setOrderedColumns, removeColumn, updateColumn }) {
   //
 
   //Khởi tạo card mới
-  const { newCardId, incrementCardId } = React.useContext(CardIdContext);
   const [newCardTitle, setNewCardTitle] = React.useState("");
+  
   const addNewCard = async () => {
+    const boardId = boardID;
+    const columnId = column._id;
+
     if (!newCardTitle) {
-      alert("Card title can not be empty!");
-      return;
+        alert("Card title cannot be empty!");
+        return;
     }
+
     const newCard = {
-      _id: `card-id-${newCardId}`,
-      boardId: "board-id-01",
-      columnId: column._id,
-      title: newCardTitle,
-      description: null,
-      cover: null,
-      memberIds: [],
-      comments: [],
-      attachments: [],
+        title: newCardTitle,
+        description: null,
+        cover: null,
+        memberIds: [],
+        comments: [],
+        attachments: [],
     };
 
     try {
-      const response = await fetch(
-        `/boards/${boardId}/columns/${column._id}/cards`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(newCard),
+        const response = await fetch(
+            `http://127.0.0.1:5000/boards/${boardId}/columns/${columnId}/cards`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(newCard),
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
         }
-      );
-      const data = await response.json();
-      console.log("New card created:", data);
-      setOrderedCards([...column.cards, data]);
-      // Update the column's cards and cardOrderIds
-      const updatedColumn = {
-        ...column,
-        cards: [...column.cards, newCard],
-        cardOrderIds: [...column.cardOrderIds, newCard._id],
-      };
-      // Update the orderedColumns array
-      setOrderedColumns((prevColumns) =>
-        prevColumns.map((col) => (col._id === column._id ? updatedColumn : col))
-      );
-      incrementCardId();
-      toggleOpenNewCardForm();
+
+        const data = await response.json();
+        console.log("New card created:", data);
+
+        // Update the ordered cards with the data returned from the API
+        setOrderedCards((prevOrderedCards) => [
+            ...prevOrderedCards,
+            data, // Use the newly created card from the response
+        ]);
+
+        // Update the column's cards and cardOrderIds
+        const updatedColumn = {
+            ...column,
+            cards: [...column.cards, data], // Use the response data here
+            cardOrderIds: [...column.cardOrderIds, data._id], // Ensure this matches the ID from the response
+        };
+
+        // Update the orderedColumns array
+        setOrderedColumns((prevColumns) =>
+            prevColumns.map((col) => (col._id === column._id ? updatedColumn : col))
+        );
+
+        toggleOpenNewCardForm();
     } catch (error) {
-      console.error("Error creating card:", error);
+        console.error("Error creating card:", error);
     }
   };
 
   //Function to remove cards
-  const removeCard = (columnId, cardId) => {
-    setOrderedColumns((prevColumns) =>
-      prevColumns.map((column) =>
-        column._id === columnId
-          ? {
-              ...column,
-              cards: column.cards.filter((card) => card._id !== cardId),
-            }
-          : column
-      )
-    );
+  const removeCard = async (columnId, cardId) => {
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:5000/boards/${boardID}/columns/${columnId}/cards/${cardId}`,
+        {
+          method: "DELETE",
+        }
+      );
+  
+      if (!response.ok) {
+        throw new Error("Failed to delete card");
+      }
+  
+      // Update local state to remove the card
+      setOrderedColumns((prevColumns) =>
+        prevColumns.map((column) =>
+          column._id === columnId
+            ? {
+                ...column,
+                cards: column.cards.filter((card) => card._id !== cardId),
+                cardOrderIds: column.cardOrderIds.filter((cid) => cid !== cardId),
+              }
+            : column
+        )
+      );
+      console.log(`Card ${cardId} removed successfully`);
+    } catch (error) {
+      console.error("Error deleting card:", error);
+    }
   };
   //
 
-  const updateCard = (columnId, updatedCard) => {
-    setOrderedColumns((prevColumns) =>
-      prevColumns.map((column) =>
-        column._id === columnId
-          ? {
-              ...column,
-              cards: column.cards.map((card) =>
-                card._id === updatedCard._id ? updatedCard : card
-              ),
-            }
-          : column
-      )
-    );
+  const updateCard = async (columnId, updatedCard) => {
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:5000/boards/${boardID}/columns/${columnId}/cards/${updatedCard._id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatedCard),
+        }
+      );
+  
+      if (!response.ok) {
+        throw new Error("Failed to update card");
+      }
+  
+      const data = await response.json();
+  
+      // Update local state with the new card data
+      setOrderedColumns((prevColumns) =>
+        prevColumns.map((column) =>
+          column._id === columnId
+            ? {
+                ...column,
+                cards: column.cards.map((card) =>
+                  card._id === updatedCard._id ? data : card
+                ),
+              }
+            : column
+        )
+      );
+      console.log(`Card ${updatedCard._id} updated successfully`);
+    } catch (error) {
+      console.error("Error updating card:", error);
+    }
   };
+  
 
   // New states for editing title
   const [isEditing, setIsEditing] = React.useState(false);
