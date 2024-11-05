@@ -1,5 +1,4 @@
 import React from "react";
-import { mockData } from "~/apis/mock-data";
 import Box from "@mui/material/Box";
 import Column from "./Column/Column";
 import Button from "@mui/material/Button";
