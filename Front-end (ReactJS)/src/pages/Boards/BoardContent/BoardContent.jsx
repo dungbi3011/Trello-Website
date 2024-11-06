@@ -58,15 +58,6 @@ function BoardContent({ board }) {
   //Điểm va chạm cuối cùng (xử lý thuật toán phát hiện va chạm)
   const lastOverId = React.useRef(null);
 
-  React.useEffect(() => {
-    // Fetch board data if not already available
-    if (!board) {
-      fetchBoardData()
-        .then((data) => setOrderedColumns(data.columns))
-        .catch((error) => console.error("Error fetching board data:", error));
-    }
-  }, [board]);
-
   //Tìm 1 column theo CardId
   const findColumnByCardId = (cardId) => {
     return orderedColumns.find((column) =>
