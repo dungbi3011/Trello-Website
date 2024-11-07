@@ -3,6 +3,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import mysql.connector
 
+
 app = Flask(__name__)
 CORS(app)
 
@@ -86,158 +87,238 @@ def get_board(board_id):
 
     return jsonify({'error': 'Board not found'}), 404
 
-# @app.route('/boards/<board_id>/columns', methods=['POST'])
-# def add_column(board_id):
-#     new_column_data = request.get_json()
+@app.route('/boards/<board_id>/columns', methods=['POST'])
+def add_column(board_id):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    # Parse the incoming JSON data
+    data = request.get_json()
+    title = data.get("title")
+    
+    # Generate a new column ID (you can use UUIDs for unique identifiers)
+    new_column_id = "column-id-" + str(uuid.uuid4())
+    
+    # Insert the new column into the 'columns' table
+    insert_column_query = """
+        INSERT INTO columns (id, board_id, title, card_order_ids)
+        VALUES (%s, %s, %s, %s)
+    """
+    cursor.execute(insert_column_query, (new_column_id, board_id, title, json.dumps([])))
+    
+    # Retrieve current column order for the board, then add the new column ID
+    cursor.execute("SELECT column_order_ids FROM boards WHERE id = %s", (board_id,))
+    result = cursor.fetchone()
+    if result:
+        column_order_ids = json.loads(result["column_order_ids"])
+        column_order_ids.append(new_column_id)
+        
+        # Update the board with the new column order
+        update_board_query = """
+            UPDATE boards SET column_order_ids = %s WHERE id = %s
+        """
+        cursor.execute(update_board_query, (json.dumps(column_order_ids), board_id))
+    
+    # Commit changes and close the connection
+    conn.commit()
+    conn.close()
+    
+    # Return the new column data to the front-end
+    new_column = {
+        "_id": new_column_id,
+        "boardId": board_id,
+        "title": title,
+        "cardOrderIds": [],
+        "cards": []
+    }
+    return jsonify(new_column), 201
 
-#     # Check if the board exists
-#     for board in board_data:
-#         if board["_id"] == board_id:
-#             # Generate a new unique ID for the column
-#             new_column_id = len(board['columns']) + 1  # Incremental ID based on existing columns
-#             new_column_id_str = f"column-id-{uuid.uuid4()}"  # Format ID as "column-id-XX"
+@app.route('/boards/<board_id>/columns/<column_id>/cards', methods=['POST'])
+def add_card(board_id, column_id):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    # Parse the incoming JSON data
+    data = request.get_json()
+    title = data.get("title", "Untitled Card")
+    description = data.get("description", "")
+    cover = data.get("cover", None)
+    member_ids = data.get("memberIds", [])
+    comments = data.get("comments", [])
+    attachments = data.get("attachments", [])
+
+    # Generate a new unique card ID (or use another method of ID generation if needed)
+    new_card_id = f"card-id-{uuid.uuid4()}"  # Example card ID based on timestamp
+
+    # Insert the new card into the 'cards' table
+    insert_card_query = """
+        INSERT INTO cards (id, column_id, title, description, cover, member_ids, comments, attachments)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+    """
+    cursor.execute(insert_card_query, (
+        new_card_id, column_id, title, description, cover, 
+        json.dumps(member_ids), json.dumps(comments), json.dumps(attachments)
+    ))
+
+    # Retrieve the current card_order_ids for the column
+    cursor.execute("SELECT card_order_ids FROM columns WHERE id = %s", (column_id,))
+    result = cursor.fetchone()
+
+    # Initialize card_order_ids as an empty list if result is None or card_order_ids is None
+    card_order_ids = json.loads(result["card_order_ids"] or '[]') if result and result["card_order_ids"] else []
+    card_order_ids.append(new_card_id)
+
+    # Update the column with the new card order
+    update_column_query = "UPDATE columns SET card_order_ids = %s WHERE id = %s"
+    cursor.execute(update_column_query, (json.dumps(card_order_ids), column_id))
+
+    # Commit changes and close the connection
+    conn.commit()
+    conn.close()
+
+    # Return the new card data
+    new_card = {
+        "_id": new_card_id,
+        "columnId": column_id,
+        "title": title,
+        "description": description,
+        "cover": cover,
+        "memberIds": member_ids,
+        "comments": comments,
+        "attachments": attachments
+    }
+    return jsonify(new_card), 201
+
+
+@app.route('/boards/<board_id>/columns/<column_id>', methods=['DELETE'])
+def remove_column(board_id, column_id):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    # Delete the column from the 'columns' table
+    delete_column_query = "DELETE FROM columns WHERE id = %s AND board_id = %s"
+    cursor.execute(delete_column_query, (column_id, board_id))
+    
+    # Retrieve the current column order and update it
+    cursor.execute("SELECT column_order_ids FROM boards WHERE id = %s", (board_id,))
+    result = cursor.fetchone()
+    if result:
+        column_order_ids = json.loads(result["column_order_ids"])
+        if column_id in column_order_ids:
+            column_order_ids.remove(column_id)
             
-#             # Prepare the new column
-#             new_column = {
-#                 "_id": new_column_id_str,
-#                 "boardId": board_id,
-#                 "title": new_column_data["title"],
-#                 "cardOrderIds": [],
-#                 "cards": [],
-#             }
-
-#             # Create a placeholder card
-#             placeholder_card = {
-#                 "_id": f"{new_column_id_str}-placeholder-card",  # Corrected placeholder ID
-#                 "boardId": board_id,
-#                 "columnId": new_column_id_str,
-#                 "FE_PlaceholderCard": True,
-#             }
-
-#             # Add the placeholder card to the new column
-#             new_column["cards"].append(placeholder_card)
-#             new_column["cardOrderIds"].append(placeholder_card["_id"])
-
-#             # Add the new column to the board's columns and columnOrderIds
-#             board["columns"].append(new_column)
-#             board["columnOrderIds"].append(new_column["_id"])
-
-#             return jsonify(new_column), 201  # Respond with the newly created column
-
-#     return jsonify({'error': f'Board not found with ID: {board_id}'}), 404
-
-# @app.route('/boards/<board_id>/columns/<column_id>/cards', methods=['POST'])
-# def add_card(board_id, column_id):
-#     new_card_data = request.get_json()
-#     new_card_id = f"card-id-{uuid.uuid4()}"
-
-#     new_card = {
-#         "_id": new_card_id,
-#         "columnId": column_id,
-#         **new_card_data  # This will unpack the other card data (title, description, etc.)
-#     }
-
-#     # Validate and process card data
-#     for board in board_data:
-#         if board["_id"] == board_id:
-#             for column in board["columns"]:
-#                 if column["_id"] == column_id:
-#                     # Add the new card to the column's cards list
-#                     column["cards"].append(new_card)
-#                     # Update cardOrderIds to reflect the new card
-#                     column["cardOrderIds"].append(new_card["_id"])
-#                     return jsonify(new_card), 201  # Return the new card and a 201 status
-#             break
-#     return jsonify({'error': 'Board not found with ID: ' + board_id}), 404
-
-# @app.route('/boards/<board_id>/columns/<column_id>', methods=['DELETE'])
-# def remove_column(board_id, column_id):
-#     # Find the board by ID
-#     for board in board_data:
-#         if board["_id"] == board_id:
-#             # Find and remove the column by ID
-#             board["columns"] = [col for col in board["columns"] if col["_id"] != column_id]
-#             # Update columnOrderIds to remove the column ID
-#             board["columnOrderIds"] = [col_id for col_id in board["columnOrderIds"] if col_id != column_id]
-#             return jsonify({"message": f"Column {column_id} deleted successfully"}), 201
+            # Update the board with the new column order
+            update_board_query = "UPDATE boards SET column_order_ids = %s WHERE id = %s"
+            cursor.execute(update_board_query, (json.dumps(column_order_ids), board_id))
     
-#     return jsonify({"error": f"Board or Column not found with IDs: {board_id}, {column_id}"}), 404
-
-# @app.route('/boards/<board_id>/columns/<column_id>/cards/<card_id>', methods=['DELETE'])
-# def remove_card(board_id, column_id, card_id):
-#     # Find the board by ID
-#     for board in board_data:
-#         if board["_id"] == board_id:
-#             # Find the column by ID within the board
-#             for column in board["columns"]:
-#                 if column["_id"] == column_id:
-#                     # Find the card by ID within the column
-#                     column["cards"] = [card for card in column["cards"] if card["_id"] != card_id]
-#                     column["cardOrderIds"] = [cid for cid in column["cardOrderIds"] if cid != card_id]
-#                     return jsonify({"message": f"Card {card_id} removed successfully"}), 201
-#             return jsonify({'error': f'Column not found with ID: {column_id}'}), 404
-#     return jsonify({'error': f'Board not found with ID: {board_id}'}), 404
-
-
-# @app.route('/boards/<board_id>/columns/<column_id>', methods=['PUT'])
-# def update_column(board_id, column_id):
-#     updated_column_data = request.get_json()
-
-#     # Find the board by ID
-#     for board in board_data:
-#         if board["_id"] == board_id:
-#             # Find the column and update its details
-#             for col in board["columns"]:
-#                 if col["_id"] == column_id:
-#                     col.update(updated_column_data)
-#                     return jsonify(col), 201
+    # Commit changes and close the connection
+    conn.commit()
+    conn.close()
     
-#     return jsonify({"error": f"Board or Column not found with IDs: {board_id}, {column_id}"}), 404
-
-# @app.route('/boards/<board_id>/columns/<column_id>/cards/<card_id>', methods=['PUT'])
-# def update_card(board_id, column_id, card_id):
-#     updated_card_data = request.get_json()
-
-#     # Find the board by ID
-#     for board in board_data:
-#         if board["_id"] == board_id:
-#             # Find the column by ID within the board
-#             for column in board["columns"]:
-#                 if column["_id"] == column_id:
-#                     # Find the card by ID within the column and update it
-#                     for idx, card in enumerate(column["cards"]):
-#                         if card["_id"] == card_id:
-#                             column["cards"][idx] = updated_card_data
-#                             return jsonify(updated_card_data), 201
-#                     return jsonify({'error': f'Card not found with ID: {card_id}'}), 404
-#             return jsonify({'error': f'Column not found with ID: {column_id}'}), 404
-#     return jsonify({'error': f'Board not found with ID: {board_id}'}), 404
+    return jsonify({"message": f"Column {column_id} removed successfully"}), 200
 
 
-# @app.route('/boards/<board_id>/columns/<column_id>/cards/<card_id>/move', methods=['PUT'])
-# def move_card(board_id, column_id, card_id, target_column_id):
-#     board = get_board(board_id)
-#     if board:
-#         for column in board['columns']:
-#             if column['_id'] == column_id:
-#                 for card in column['cards']:
-#                     if card['_id'] == card_id:
-#                         column['cards'].remove(card)
-#                         break
-#                 break
-#         for column in board['columns']:
-#             if column['_id'] == target_column_id:
-#                 column['cards'].append(card)
-#                 break
-#         update_board(board)
-#         return jsonify({'message': 'Card moved successfully'}), 200
-#     else:
-#         return jsonify({'error': 'Board not found with ID: ' + board_id}), 404
+@app.route('/boards/<board_id>/columns/<column_id>/cards/<card_id>', methods=['DELETE'])
+def remove_card(board_id, column_id, card_id):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    # Delete the card from the 'cards' table
+    delete_card_query = "DELETE FROM cards WHERE id = %s AND column_id = %s"
+    cursor.execute(delete_card_query, (card_id, column_id))
+    
+    # Update the card order in the column
+    cursor.execute("SELECT card_order_ids FROM columns WHERE id = %s", (column_id,))
+    result = cursor.fetchone()
+    if result:
+        card_order_ids = json.loads(result["card_order_ids"])
+        if card_id in card_order_ids:
+            card_order_ids.remove(card_id)
+            update_column_query = "UPDATE columns SET card_order_ids = %s WHERE id = %s"
+            cursor.execute(update_column_query, (json.dumps(card_order_ids), column_id))
+    
+    # Commit changes and close the connection
+    conn.commit()
+    conn.close()
+    return jsonify({"message": f"Card {card_id} removed successfully"}), 200
 
-# def update_board(board):
-#     # Replace this with your actual board update logic (e.g., saving to a database)
-#     global board_data  # Assuming board_data is a global variable
-#     board_data = board
+
+@app.route('/boards/<board_id>/columns/<column_id>', methods=['PUT'])
+def update_column(board_id, column_id):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    # Parse the incoming JSON data
+    data = request.get_json()
+    title = data.get("title")
+    card_order_ids = data.get("cardOrderIds", [])
+
+    # Update the column in the 'columns' table
+    update_column_query = """
+        UPDATE columns 
+        SET title = %s, card_order_ids = %s 
+        WHERE id = %s AND board_id = %s
+    """
+    cursor.execute(update_column_query, (title, json.dumps(card_order_ids), column_id, board_id))
+    
+    # Commit changes and close the connection
+    conn.commit()
+    conn.close()
+    
+    # Return the updated column data
+    updated_column = {
+        "_id": column_id,
+        "boardId": board_id,
+        "title": title,
+        "cardOrderIds": card_order_ids,
+        "cards": []  # cards will be populated on the front-end based on card order
+    }
+    return jsonify(updated_column), 200
+
+
+@app.route('/boards/<board_id>/columns/<column_id>/cards/<card_id>', methods=['PUT'])
+def update_card(board_id, column_id, card_id):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    # Parse the incoming JSON data
+    data = request.get_json()
+    title = data.get("title")
+    description = data.get("description")
+    cover = data.get("cover")
+    member_ids = data.get("memberIds", [])
+    comments = data.get("comments", [])
+    attachments = data.get("attachments", [])
+
+    # Update the card in the 'cards' table
+    update_card_query = """
+        UPDATE cards 
+        SET title = %s, description = %s, cover = %s, member_ids = %s, comments = %s, attachments = %s
+        WHERE id = %s AND column_id = %s
+    """
+    cursor.execute(update_card_query, (
+        title, description, cover, json.dumps(member_ids), json.dumps(comments), json.dumps(attachments), 
+        card_id, column_id
+    ))
+
+    # Commit changes and close the connection
+    conn.commit()
+    conn.close()
+
+    # Return the updated card data
+    updated_card = {
+        "_id": card_id,
+        "columnId": column_id,
+        "title": title,
+        "description": description,
+        "cover": cover,
+        "memberIds": member_ids,
+        "comments": comments,
+        "attachments": attachments
+    }
+    return jsonify(updated_card), 200
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -73,7 +73,6 @@ function Column({
   const [newCardTitle, setNewCardTitle] = React.useState("");
   
   const addNewCard = async () => {
-    const boardId = boardID;
     const columnId = column._id;
 
     if (!newCardTitle) {
@@ -92,7 +91,7 @@ function Column({
 
     try {
         const response = await fetch(
-            `http://127.0.0.1:5000/boards/${boardId}/columns/${columnId}/cards`,
+            `http://127.0.0.1:5000/boards/${boardID}/columns/${columnId}/cards`,
             {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
