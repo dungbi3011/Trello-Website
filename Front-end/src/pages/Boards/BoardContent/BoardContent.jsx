@@ -66,7 +66,6 @@ function BoardContent({ board }) {
     );
   };
 
-  
   //Function cập nhật lại state khi di chuyển các card trong cùng 1 column
   const moveCardsInColumn = async (
     overColumn,
@@ -293,11 +292,7 @@ function BoardContent({ board }) {
         );
       } else {
         // Di chuyển card cùng 1 cột
-        moveCardsInColumn(
-          overColumn,
-          activeDragItemId,
-          overCardId
-        ); 
+        moveCardsInColumn(overColumn, activeDragItemId, overCardId);
       }
     }
 
@@ -315,29 +310,37 @@ function BoardContent({ board }) {
       if (activeDragItemType === ACTIVE_DRAG_ITEM_TYPE.COLUMN) {
         if (active.id !== over.id) {
           // Find old and new index positions
-          const oldColumnIndex = orderedColumns.findIndex((c) => c._id === active.id);
-          const newColumnIndex = orderedColumns.findIndex((c) => c._id === over.id);
-    
+          const oldColumnIndex = orderedColumns.findIndex(
+            (c) => c._id === active.id
+          );
+          const newColumnIndex = orderedColumns.findIndex(
+            (c) => c._id === over.id
+          );
+
           // Reorder columns array
-          const dndOrderedColumns = arrayMove(orderedColumns, oldColumnIndex, newColumnIndex);
+          const dndOrderedColumns = arrayMove(
+            orderedColumns,
+            oldColumnIndex,
+            newColumnIndex
+          );
           const dndOrderedColumnsIds = dndOrderedColumns.map((c) => c._id);
-    
+
           // Update state for UI
           setOrderedColumns(dndOrderedColumns);
-    
+
           // API call to update column order in the back-end
           try {
             const response = await axios.patch(
               `http://127.0.0.1:5000/boards/${board._id}/columns/move`,
               { columnOrderIds: dndOrderedColumnsIds }
             );
-            console.log('Column order updated:', response.data.message);
+            console.log("Column order updated:", response.data.message);
           } catch (error) {
-            console.error('Error updating column order:', error);
+            console.error("Error updating column order:", error);
           }
         }
       }
-    
+
       // Reset drag states
       setActiveDragItemId(null);
       setActiveDragItemType(null);
@@ -355,7 +358,7 @@ function BoardContent({ board }) {
       setActiveDragItemType,
       setActiveDragItemData,
       setOldColumnWhenDraggingCard
-    )
+    );
   };
 
   const isOverlapping = (rect1, rect2) => {
