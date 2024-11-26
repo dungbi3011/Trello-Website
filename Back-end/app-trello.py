@@ -34,13 +34,16 @@ def get_board(board_id):
     query = """
     SELECT b.id as _id, b.title, b.description, b.type, 
            b.owner_ids, b.member_ids, b.column_order_ids as columnOrderIds, 
-           c.id as column_id, c.title as column_title, c.card_order_ids, 
+           co.id as column_id, co.title as column_title, co.card_order_ids, 
            ca.id as card_id, ca.title as card_title, ca.description as card_description, 
            ca.cover as card_cover, ca.member_ids as card_member_ids, 
            ca.comments as card_comments, ca.attachments as card_attachments
     FROM boards b
-    LEFT JOIN columns c ON b.id = c.board_id
-    LEFT JOIN cards ca ON c.id = ca.column_id
+    LEFT JOIN columns co ON b.id = co.board_id
+    LEFT JOIN cards ca ON co.id = ca.column_id
+    LEFT JOIN card_attachments cat ON ca.id = cat.card_id 
+    LEFT JOIN card_members cm ON ca.id = cm.card_id 
+    LEFT JOIN card_comments cc ON ca.id = cc.card_id 
     WHERE b.id = %s
     """
 
