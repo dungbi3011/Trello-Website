@@ -13,7 +13,7 @@ db_config = {
     "password": "",
     "host": "localhost",
     "port": "3308",
-    "database": "trello_website",
+    "database": "trello_demo",
 }
 
 
@@ -30,59 +30,55 @@ def get_board(board_id):
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
 
-    # Query to fetch the board and its related columns and cards using JOINs
+    # Updated SQL query to fetch board, columns, and cards with positions
     query = """
     SELECT b.id as _id, b.title, b.description, b.type, 
-           b.owner_ids, b.member_ids, b.column_order_ids as columnOrderIds, 
-           co.id as column_id, co.title as column_title, co.card_order_ids, 
+           co.id as column_id, co.title as column_title, co.position as column_position, 
            ca.id as card_id, ca.title as card_title, ca.description as card_description, 
-           ca.cover as card_cover, ca.member_ids as card_member_ids, 
-           ca.comments as card_comments, ca.attachments as card_attachments
+           ca.cover as card_cover, ca.position as card_position
     FROM boards b
     LEFT JOIN columns co ON b.id = co.board_id
     LEFT JOIN cards ca ON co.id = ca.column_id
-    LEFT JOIN card_attachments cat ON ca.id = cat.card_id 
-    LEFT JOIN card_members cm ON ca.id = cm.card_id 
-    LEFT JOIN card_comments cc ON ca.id = cc.card_id 
     WHERE b.id = %s
+    ORDER BY co.position ASC, ca.position ASC;
     """
 
     cursor.execute(query, (board_id,))
     rows = cursor.fetchall()
 
     if rows:
-        # Group data to reconstruct the board structure
+        # Initialize board structure
         board = {}
         columns = {}
+        column_order_ids = []  # To store column IDs in order
+        card_order_ids_map = {}  # To store cardOrderIds for each column
+
         for row in rows:
             if not board:
-                # Initialize board information (first row will have board details)
+                # Initialize board details (first row will always contain board details)
                 board = {
-                    key: row[key]
-                    for key in row
-                    if key
-                    not in ("column_id", "card_id", "column_title", "card_order_ids")
+                    "_id": row["_id"],
+                    "title": row["title"],
+                    "description": row["description"],
+                    "type": row["type"],
+                    "columns": [],
                 }
-                board["columns"] = []
-                board["columnOrderIds"] = row["columnOrderIds"]  # Use the correct key
 
             if row["column_id"]:
                 column_id = row["column_id"]
                 if column_id not in columns:
-                    # Add column to columns dictionary if not already added
+                    # Add column to the dictionary if not already added
                     columns[column_id] = {
                         "_id": column_id,
                         "boardId": board_id,
                         "title": row["column_title"],
-                        "cardOrderIds": (
-                            json.loads(row["card_order_ids"])
-                            if row["card_order_ids"]
-                            else []
-                        ),
+                        "cardOrderIds": [],  # Will populate this after iterating
                         "cards": [],
                     }
-                    # Add column to the board's columns
-                    board["columns"].append(columns[column_id])
+                    # Append the column ID to the column_order_ids list
+                    column_order_ids.append(column_id)
+                    # Initialize cardOrderIds list for this column
+                    card_order_ids_map[column_id] = []
 
                 if row["card_id"]:
                     # Add card to the appropriate column
@@ -92,27 +88,23 @@ def get_board(board_id):
                         "title": row["card_title"],
                         "description": row["card_description"],
                         "cover": row["card_cover"],
-                        "memberIds": (
-                            json.loads(row["card_member_ids"])
-                            if row["card_member_ids"]
-                            else []
-                        ),
-                        "comments": (
-                            json.loads(row["card_comments"])
-                            if row["card_comments"]
-                            else []
-                        ),
-                        "attachments": (
-                            json.loads(row["card_attachments"])
-                            if row["card_attachments"]
-                            else []
-                        ),
                     }
                     columns[column_id]["cards"].append(card)
+                    # Append the card ID to the cardOrderIds for this column
+                    card_order_ids_map[column_id].append(row["card_id"])
+
+        # After processing all rows, populate cardOrderIds for each column
+        for column_id, column in columns.items():
+            column["cardOrderIds"] = card_order_ids_map[column_id]
+            board["columns"].append(column)
+
+        # Add columnOrderIds to the board
+        board["columnOrderIds"] = column_order_ids
 
         return jsonify(board), 200
 
     return jsonify({"error": "Board not found"}), 404
+
 
 
 @app.route("/boards/<board_id>/columns", methods=["POST"])
@@ -122,28 +114,25 @@ def add_column(board_id):
 
     # Parse the incoming JSON data
     data = request.get_json()
-    new_column_id = "column-id-" + str(uuid.uuid4()) # random columnID
+    new_column_id = "column-id-" + str(uuid.uuid4())  # Generate random column ID
     title = data.get("title")
+
+    # Find the maximum position of existing columns in the board
+    cursor.execute("SELECT MAX(position) AS max_position FROM columns WHERE board_id = %s", (board_id,))
+    result = cursor.fetchone()
+    max_position = result["max_position"] if result and result["max_position"] is not None else 0
+
+    # Assign the new column position (next available position)
+    new_position = max_position + 1
 
     # Insert the new column into the 'columns' table
     insert_column_query = """
-        INSERT INTO columns (id, board_id, title, card_order_ids)
+        INSERT INTO columns (id, board_id, title, position)
         VALUES (%s, %s, %s, %s)
     """
-    cursor.execute(
-        insert_column_query, (new_column_id, board_id, title, json.dumps([]))
-    )
+    cursor.execute(insert_column_query, (new_column_id, board_id, title, new_position))
 
-    # Select column_order_ids from database & update it
-    cursor.execute("SELECT column_order_ids FROM boards WHERE id = %s", (board_id,))
-    result = cursor.fetchone()
-    if result:
-        column_order_ids = json.loads(result["column_order_ids"])
-        column_order_ids.append(new_column_id)
-        update_board_query = "UPDATE boards SET column_order_ids = %s WHERE id = %s"
-        cursor.execute(update_board_query, (json.dumps(column_order_ids), board_id))
-
-    # 
+    # Commit the changes and close the connection
     conn.commit()
     conn.close()
 
@@ -152,10 +141,11 @@ def add_column(board_id):
         "_id": new_column_id,
         "boardId": board_id,
         "title": title,
-        "cardOrderIds": [],
-        "cards": [],
+        "cardOrderIds": [],  # No cards yet in the new column
+        "cards": [],         # No cards yet in the new column
     }
     return jsonify(new_column), 201
+
 
 
 @app.route("/boards/<board_id>/columns/<column_id>/cards", methods=["POST"])
@@ -234,19 +224,6 @@ def remove_column(board_id, column_id):
     # Delete the column from the 'columns' table
     delete_column_query = "DELETE FROM columns WHERE id = %s AND board_id = %s"
     cursor.execute(delete_column_query, (column_id, board_id))
-
-    # Select column_order_ids from database & update it
-    cursor.execute("SELECT column_order_ids FROM boards WHERE id = %s", (board_id,))
-    result = cursor.fetchone()
-    if result:
-        column_order_ids = json.loads(result["column_order_ids"])
-        if column_id in column_order_ids:
-            column_order_ids.remove(column_id)
-
-            # Update the board with the new column order
-            update_board_query = "UPDATE boards SET column_order_ids = %s WHERE id = %s"
-            cursor.execute(update_board_query, (json.dumps(column_order_ids), board_id))
-
     #
     conn.commit()
     conn.close()
@@ -289,27 +266,44 @@ def update_column(board_id, column_id):
     title = data.get("title")
     card_order_ids = data.get("cardOrderIds", [])
 
-    # Update the column in the 'columns' table
+    # Update the column's title in the 'columns' table
     update_column_query = """
         UPDATE columns 
-        SET title = %s, card_order_ids = %s 
+        SET title = %s 
         WHERE id = %s AND board_id = %s
     """
-    cursor.execute(
-        update_column_query, (title, json.dumps(card_order_ids), column_id, board_id)
-    )
+    cursor.execute(update_column_query, (title, column_id, board_id))
 
-    #
+    # Update the positions of cards if cardOrderIds are provided
+    if card_order_ids:
+        for index, card_id in enumerate(card_order_ids):
+            update_card_position_query = """
+                UPDATE cards 
+                SET position = %s 
+                WHERE id = %s AND column_id = %s
+            """
+            cursor.execute(update_card_position_query, (index + 1, card_id, column_id))
+
+    # Fetch the updated cards for the column
+    fetch_cards_query = """
+        SELECT id as _id, column_id, title, description, cover, position 
+        FROM cards 
+        WHERE column_id = %s 
+        ORDER BY position
+    """
+    cursor.execute(fetch_cards_query, (column_id,))
+    cards = cursor.fetchall()
+
     conn.commit()
     conn.close()
 
-    # Return the updated column data
+    # Return the updated column data, including the cards
     updated_column = {
         "_id": column_id,
         "boardId": board_id,
         "title": title,
-        "cardOrderIds": card_order_ids,
-        "cards": [],  # cards will be populated on the front-end based on card order
+        "cardOrderIds": [card["_id"] for card in cards],  # Reconstruct from database
+        "cards": cards,  # Include updated cards
     }
     return jsonify(updated_column), 200
 
@@ -371,16 +365,28 @@ def update_column_order(board_id):
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
 
+    # Parse the incoming JSON data
     data = request.get_json()
     column_order_ids = data.get("columnOrderIds", [])
     if not column_order_ids:
         return jsonify({"error": "No column order provided"}), 400
-    cursor.execute(
-        "UPDATE boards SET column_order_ids = %s WHERE id = %s",
-        (json.dumps(column_order_ids), board_id),
-    )
+
+    # Assign new positions to the columns based on their order
+    for index, column_id in enumerate(column_order_ids):
+        # Assign a new position as a float
+        new_position = index + 1.0
+        update_position_query = """
+            UPDATE columns 
+            SET position = %s 
+            WHERE id = %s AND board_id = %s
+        """
+        cursor.execute(update_position_query, (new_position, column_id, board_id))
+
     conn.commit()
+    conn.close()
+
     return jsonify({"message": "Column order updated successfully"}), 200
+
 
 
 @app.route("/boards/<board_id>/columns/<column_id>/cards/move", methods=["PATCH"])
