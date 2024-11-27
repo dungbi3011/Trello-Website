@@ -25,6 +25,8 @@ app = Flask(__name__)
 CORS(app)
 
 
+
+#API-1: Retrieving data from database (boards, columns, cards) 
 @app.route("/boards/<board_id>", methods=["GET"])
 def get_board(board_id):
     conn = get_db_connection()
@@ -107,6 +109,7 @@ def get_board(board_id):
 
 
 
+#API-2: Adding a column to the board
 @app.route("/boards/<board_id>/columns", methods=["POST"])
 def add_column(board_id):
     conn = get_db_connection()
@@ -148,6 +151,7 @@ def add_column(board_id):
 
 
 
+#API-3: Adding a card to the column
 @app.route("/boards/<board_id>/columns/<column_id>/cards", methods=["POST"])
 def add_card(board_id, column_id):
     conn = get_db_connection()
@@ -158,15 +162,20 @@ def add_card(board_id, column_id):
     new_card_id = f"card-id-{uuid.uuid4()}"  # random cardID
     title = data.get("title", "Untitled Card")
     description = data.get("description", "")
-    cover = data.get("cover", None)
-    member_ids = data.get("memberIds", [])
-    comments = data.get("comments", [])
-    attachments = data.get("attachments", [])
+    cover = data.get("cover", "")
+
+    # Find the maximum position of existing columns in the board
+    cursor.execute("SELECT MAX(position) AS max_position FROM cards WHERE column_id = %s", (column_id,))
+    result = cursor.fetchone()
+    max_position = result["max_position"] if result and result["max_position"] is not None else 0
+
+    # Assign the new column position (next available position)
+    new_position = max_position + 1
 
     # Insert the new card into the 'cards' table
     insert_card_query = """
-        INSERT INTO cards (id, column_id, title, description, cover, member_ids, comments, attachments)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO cards (id, column_id, title, description, cover, position)
+        VALUES (%s, %s, %s, %s, %s, %s)
     """
     cursor.execute(
         insert_card_query,
@@ -176,28 +185,9 @@ def add_card(board_id, column_id):
             title,
             description,
             cover,
-            json.dumps(member_ids),
-            json.dumps(comments),
-            json.dumps(attachments),
+            new_position,
         ),
     )
-
-   # Select card_order_ids from database 
-    cursor.execute("SELECT card_order_ids FROM columns WHERE id = %s", (column_id,))
-    result = cursor.fetchone()
-
-    # Initialize card_order_ids as an empty list if result is None or card_order_ids is None
-    card_order_ids = (
-        json.loads(result["card_order_ids"] or "[]")
-        if result and result["card_order_ids"]
-        else []
-    )
-    card_order_ids.append(new_card_id)
-
-    # Update card_order_ids
-    update_column_query = "UPDATE columns SET card_order_ids = %s WHERE id = %s"
-    cursor.execute(update_column_query, (json.dumps(card_order_ids), column_id))
-
     #
     conn.commit()
     conn.close()
@@ -209,13 +199,15 @@ def add_card(board_id, column_id):
         "title": title,
         "description": description,
         "cover": cover,
-        "memberIds": member_ids,
-        "comments": comments,
-        "attachments": attachments,
+        "memberIds": [],
+        "comments": [],
+        "attachments": [],
     }
     return jsonify(new_card), 201
 
 
+
+#API-4: Removing a column from the board
 @app.route("/boards/<board_id>/columns/<column_id>", methods=["DELETE"])
 def remove_column(board_id, column_id):
     conn = get_db_connection()
@@ -225,12 +217,15 @@ def remove_column(board_id, column_id):
     delete_column_query = "DELETE FROM columns WHERE id = %s AND board_id = %s"
     cursor.execute(delete_column_query, (column_id, board_id))
     #
+
     conn.commit()
     conn.close()
 
     return jsonify({"message": f"Column {column_id} removed successfully"}), 200
 
 
+
+#API-5: Removing a card from the column
 @app.route("/boards/<board_id>/columns/<column_id>/cards/<card_id>", methods=["DELETE"])
 def remove_card(board_id, column_id, card_id):
     conn = get_db_connection()
@@ -239,23 +234,15 @@ def remove_card(board_id, column_id, card_id):
     # Delete the card from the 'cards' table
     delete_card_query = "DELETE FROM cards WHERE id = %s AND column_id = %s"
     cursor.execute(delete_card_query, (card_id, column_id))
-
-    # Select card_order_ids from database & update it
-    cursor.execute("SELECT card_order_ids FROM columns WHERE id = %s", (column_id,))
-    result = cursor.fetchone()
-    if result:
-        card_order_ids = json.loads(result["card_order_ids"])
-        if card_id in card_order_ids:
-            card_order_ids.remove(card_id)
-            update_column_query = "UPDATE columns SET card_order_ids = %s WHERE id = %s"
-            cursor.execute(update_column_query, (json.dumps(card_order_ids), column_id))
-
     #
+
     conn.commit()
     conn.close()
     return jsonify({"message": f"Card {card_id} removed successfully"}), 200
 
 
+
+#API-6: Updating a column's title 
 @app.route("/boards/<board_id>/columns/<column_id>", methods=["PUT"])
 def update_column(board_id, column_id):
     conn = get_db_connection()
@@ -308,6 +295,8 @@ def update_column(board_id, column_id):
     return jsonify(updated_column), 200
 
 
+
+#API-7: Updating a card's title 
 @app.route("/boards/<board_id>/columns/<column_id>/cards/<card_id>", methods=["PUT"])
 def update_card(board_id, column_id, card_id):
     conn = get_db_connection()
@@ -325,23 +314,17 @@ def update_card(board_id, column_id, card_id):
     # Update the card in the 'cards' table
     update_card_query = """
         UPDATE cards 
-        SET title = %s, description = %s, cover = %s, member_ids = %s, comments = %s, attachments = %s
+        SET title = %s
         WHERE id = %s AND column_id = %s
     """
     cursor.execute(
         update_card_query,
         (
             title,
-            description,
-            cover,
-            json.dumps(member_ids),
-            json.dumps(comments),
-            json.dumps(attachments),
             card_id,
             column_id,
         ),
     )
-
     # 
     conn.commit()
     conn.close()
@@ -360,6 +343,8 @@ def update_card(board_id, column_id, card_id):
     return jsonify(updated_card), 200
 
 
+
+#API-8: Updating the position of columns 
 @app.route("/boards/<board_id>/columns/move", methods=["PATCH"])
 def update_column_order(board_id):
     conn = get_db_connection()
@@ -389,6 +374,7 @@ def update_column_order(board_id):
 
 
 
+#API-9: Updating the position of cards within a column 
 @app.route("/boards/<board_id>/columns/<column_id>/cards/move", methods=["PATCH"])
 def move_cards_in_column(board_id, column_id):
     conn = get_db_connection()
@@ -414,6 +400,8 @@ def move_cards_in_column(board_id, column_id):
     return jsonify({"message": "Card order updated successfully"}), 200
 
 
+
+#API-10: Updating the position of cards after dragging within 2 different columns
 @app.route(
     "/boards/<board_id>/columns/<from_column_id>/cards/<card_id>/move",
     methods=["PATCH"],
