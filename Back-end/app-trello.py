@@ -366,7 +366,7 @@ def update_column_order(board_id):
             WHERE id = %s AND board_id = %s
         """
         cursor.execute(update_position_query, (new_position, column_id, board_id))
-
+    #
     conn.commit()
     conn.close()
 
@@ -385,15 +385,17 @@ def move_cards_in_column(board_id, column_id):
 
     if not card_order_ids:
         return jsonify({"error": "cardOrderIds is required"}), 400
-
-    # Update the card_order_ids in the column
-    update_column_query = (
-        "UPDATE columns SET card_order_ids = %s WHERE id = %s AND board_id = %s"
-    )
-    cursor.execute(
-        update_column_query, (json.dumps(card_order_ids), column_id, board_id)
-    )
-
+    
+    # Assign new positions to the columns based on their order
+    for index, card_id in enumerate(card_order_ids):
+        # Assign a new position as a float
+        new_position = index + 1.0
+        update_position_query = """
+            UPDATE cards 
+            SET position = %s 
+            WHERE id = %s AND column_id = %s
+        """
+        cursor.execute(update_position_query, (new_position, card_id, column_id))
     #
     conn.commit()
     conn.close()
