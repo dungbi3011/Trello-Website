@@ -1,4 +1,4 @@
-import uuid, json
+import uuid
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import mysql.connector
@@ -44,7 +44,6 @@ def get_board(board_id):
     WHERE b.id = %s
     ORDER BY co.position ASC, ca.position ASC;
     """
-
     cursor.execute(query, (board_id,))
     rows = cursor.fetchall()
 
@@ -54,6 +53,10 @@ def get_board(board_id):
         columns = {}
         column_order_ids = []  # To store column IDs in order
         card_order_ids_map = {}  # To store cardOrderIds for each column
+
+        # Prepare lists to store updated position data
+        updated_columns = []
+        updated_cards = []
 
         for row in rows:
             if not board:
@@ -77,8 +80,11 @@ def get_board(board_id):
                         "cardOrderIds": [],  # Will populate this after iterating
                         "cards": [],
                     }
-                    # Append the column ID to the column_order_ids list
-                    column_order_ids.append(column_id)
+                    column_order_ids.append(column_id)  # Append to the column order
+
+                    # Add column to updated columns list with new position
+                    updated_columns.append((len(column_order_ids), column_id))
+
                     # Initialize cardOrderIds list for this column
                     card_order_ids_map[column_id] = []
 
@@ -95,7 +101,15 @@ def get_board(board_id):
                     # Append the card ID to the cardOrderIds for this column
                     card_order_ids_map[column_id].append(row["card_id"])
 
-        # After processing all rows, populate cardOrderIds for each column
+                    # Add card to updated cards list with new position
+                    updated_cards.append(
+                        (
+                            len(card_order_ids_map[column_id]),
+                            row["card_id"],
+                        )
+                    )
+
+        # Update cardOrderIds for each column
         for column_id, column in columns.items():
             column["cardOrderIds"] = card_order_ids_map[column_id]
             board["columns"].append(column)
@@ -103,8 +117,33 @@ def get_board(board_id):
         # Add columnOrderIds to the board
         board["columnOrderIds"] = column_order_ids
 
+        # Update column positions in the database
+        for position, column_id in updated_columns:
+            cursor.execute(
+                """
+                UPDATE columns 
+                SET position = %s 
+                WHERE id = %s
+                """,
+                (position, column_id),
+            )
+
+        # Update card positions in the database
+        for position, card_id in updated_cards:
+            cursor.execute(
+                """
+                UPDATE cards 
+                SET position = %s 
+                WHERE id = %s
+                """,
+                (position, card_id),
+            )
+
+        conn.commit()  # Commit the updates
+        conn.close()
         return jsonify(board), 200
 
+    conn.close()
     return jsonify({"error": "Board not found"}), 404
 
 
@@ -408,48 +447,64 @@ def move_cards_in_column(board_id, column_id):
     "/boards/<board_id>/columns/<from_column_id>/cards/<card_id>/move",
     methods=["PATCH"],
 )
-def move_card_between_diferent_columns(board_id, from_column_id, card_id):
+def move_card_between_different_columns(board_id, from_column_id, card_id):
     data = request.get_json()
     to_column_id = data.get("toColumnId")
+    active_card_order_ids = data.get("activeCardOrderIds", [])  # Updated card order from the front-end
+    over_card_order_ids = data.get("overCardOrderIds", [])  # Updated card order from the front-end
     new_card_index = data.get("newCardIndex")
+
+    # Validate input
+    if not to_column_id:
+        return jsonify({"error": "Target column ID is missing"}), 400
 
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
 
-    # Remove card from the old column
+    # Update the column ID for the moved card
     cursor.execute(
-        "SELECT card_order_ids FROM columns WHERE id = %s", (from_column_id,)
-    )
-    from_column_data = cursor.fetchone()
-    if from_column_data and from_column_data["card_order_ids"]:
-        from_card_order_ids = json.loads(from_column_data["card_order_ids"])
-        from_card_order_ids.remove(card_id)
-        cursor.execute(
-            "UPDATE columns SET card_order_ids = %s WHERE id = %s",
-            (json.dumps(from_card_order_ids), from_column_id),
-        )
-
-    # Add card to the new column
-    cursor.execute("SELECT card_order_ids FROM columns WHERE id = %s", (to_column_id,))
-    to_column_data = cursor.fetchone()
-    if to_column_data and to_column_data["card_order_ids"]:
-        to_card_order_ids = json.loads(to_column_data["card_order_ids"])
-        to_card_order_ids.insert(new_card_index, card_id)
-        cursor.execute(
-            "UPDATE columns SET card_order_ids = %s WHERE id = %s",
-            (json.dumps(to_card_order_ids), to_column_id),
-        )
-
-    # Update the card's columnId to the new column
-    cursor.execute(
-        "UPDATE cards SET column_id = %s WHERE id = %s", (to_column_id, card_id)
+        """
+        UPDATE cards 
+        SET column_id = %s 
+        WHERE id = %s
+        """,
+        (to_column_id, card_id),
     )
 
-    # 
+    # Update positions of cards in the old column based on the provided order
+    current_position = 1.0
+    for card_id_in_order in active_card_order_ids:
+        cursor.execute(
+            """
+            UPDATE cards 
+            SET position = %s 
+            WHERE id = %s AND column_id = %s
+            """,
+            (current_position, card_id_in_order, from_column_id),
+        )
+        current_position += 1.0
+
+    # Insert the dragged card into the target column's order
+    over_card_order_ids.insert(new_card_index, card_id)
+
+    # Update positions of cards in the new column based on the new order
+    current_position = 1.0
+    for card_id_in_order in over_card_order_ids:
+        cursor.execute(
+            """
+            UPDATE cards 
+            SET position = %s 
+            WHERE id = %s AND column_id = %s
+            """,
+            (current_position, card_id_in_order, to_column_id),
+        )
+        current_position += 1.0
+
     conn.commit()
     conn.close()
 
     return jsonify({"message": "Card moved successfully"}), 200
+
 
 
 if __name__ == "__main__":

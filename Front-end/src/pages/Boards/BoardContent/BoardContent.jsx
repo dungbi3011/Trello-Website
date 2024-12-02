@@ -189,6 +189,8 @@ function BoardContent({ board }) {
         .patch(
           `http://127.0.0.1:5000/boards/${board._id}/columns/${activeColumn._id}/cards/${activeDraggingCardId}/move`,
           {
+            activeCardOrderIds: nextActiveColumn.cardOrderIds,
+            overCardOrderIds: nextOverColumn.cardOrderIds,
             toColumnId: overColumn._id,
             newCardIndex: newCardIndex,
           }
