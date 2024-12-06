@@ -12,8 +12,9 @@ card_bp = Blueprint("card", __name__)
 
 @card_bp.route("/boards/<board_id>/columns/<column_id>/cards", methods=["POST"])
 def add_card(board_id, column_id):
+    data = request.get_json()
     try:
-        new_card = add_card_service(board_id, column_id)
+        new_card = add_card_service(board_id, column_id, data)
         return jsonify(new_card), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -34,8 +35,9 @@ def remove_card(board_id, column_id, card_id):
     "/boards/<board_id>/columns/<column_id>/cards/<card_id>", methods=["PUT"]
 )
 def update_card(board_id, column_id, card_id):
+    data = request.get_json()
     try:
-        new_card = update_card_service(board_id, column_id, card_id)
+        new_card = update_card_service(board_id, column_id, card_id, data)
         return jsonify(new_card), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -43,8 +45,9 @@ def update_card(board_id, column_id, card_id):
 
 @card_bp.route("/boards/<board_id>/columns/<column_id>/cards/move", methods=["PATCH"])
 def move_cards_in_column(board_id, column_id):
+    data = request.get_json()
     try:
-        message = move_cards_in_column_service(board_id, column_id)
+        message = move_cards_in_column_service(board_id, column_id, data)
         return jsonify(message), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -55,8 +58,9 @@ def move_cards_in_column(board_id, column_id):
     methods=["PATCH"],
 )
 def move_cards_between_different_columns(board_id, from_column_id, card_id):
+    data = request.get_json()
     try:
-        message = move_cards_between_different_columns_service(board_id, from_column_id, card_id)
+        message = move_cards_between_different_columns_service(board_id, from_column_id, card_id, data)
         return jsonify(message), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
